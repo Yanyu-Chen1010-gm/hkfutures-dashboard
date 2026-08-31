@@ -1,0 +1,12 @@
+# Caddy reverse proxy -> auto HTTPS from Let's Encrypt.
+# Replace YOUR_DOMAIN with your site. Caddy handles cert renewal automatically.
+# Put this in /etc/caddy/Caddyfile (or your Caddyfile) on a light server.
+
+YOUR_DOMAIN {
+    reverse_proxy 127.0.0.1:8031
+
+    # Optional: put a path on your existing site, e.g. /futures
+    # handle_path /futures {
+    #     reverse_proxy 127.0.0.1:8031
+    # }
+}

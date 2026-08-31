@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HK Futures · Risk &amp; Market Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1420; --panel:#171f2e; --panel2:#131a27; --line:#24334d;
+    --txt:#e7edf6; --muted:#8697b3; --up:#3ddc84; --down:#ff5566;
+    --accent:#6aa9ff; --warn:#ffb454;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC",sans-serif;padding:24px}
+  h1{font-size:19px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+  h1 .src{font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  h1 .src.live{color:var(--up);border-color:var(--up)}
+  h1 .src.demo{color:var(--warn);border-color:var(--warn)}
+  h1 .src.mixed{color:var(--accent);border-color:var(--accent)}
+  .sub{color:var(--muted);font-size:12.5px;margin-bottom:20px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .panel.full{grid-column:1/-1}
+  .panel h2{font-size:13.5px;color:var(--muted);font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:12px}
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .tile{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px}
+  .tile .k{font-size:11px;color:var(--muted)}
+  .tile .v{font-size:20px;font-weight:600;margin-top:2px}
+  .tile .v.small{font-size:15px}
+  .up{color:var(--up)} .down{color:var(--down)}
+  .chart{width:100%;height:210px;margin-top:6px}
+  /* risk form */
+  .row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+  label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+  input,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    border-radius:6px;padding:8px 10px;font-size:13px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .out{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .out .tile .v{font-size:17px}
+  .note{font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5}
+  .note b{color:var(--warn)}
+  .ref{font-size:12px;line-height:1.7}
+  .ref td{padding:5px 8px}
+  .ref td:first-child{color:var(--muted)}
+  .hint{color:var(--muted);font-size:11px;margin-bottom:10px}
+  @media(max-width:900px){.grid,.row,.out{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+  <h1>HK Futures · Risk &amp; Market Monitor
+    <span id="src" class="src demo">demo feed</span>
+  </h1>
+  <div class="sub">Client-support view · Orient Futures-style desk walkthrough · margin mechanics for HSI / MHI / HHI</div>
+
+  <div class="grid">
+    <!-- Market monitor -->
+    <div class="panel">
+      <h2>Market monitor</h2>
+      <div class="tiles">
+        <div class="tile"><div class="k">HSI Index</div><div class="v" id="hsiIdx">—</div></div>
+        <div class="tile"><div class="k">HSI Fut / basis</div><div class="v small" id="hsiFut">—</div></div>
+        <div class="tile"><div class="k">HHI Index</div><div class="v" id="hhiIdx">—</div></div>
+        <div class="tile"><div class="k">Day change</div><div class="v" id="chg">—</div></div>
+      </div>
+      <div class="chart" id="spark"></div>
+      <div class="hint">Demo feed = deterministic from a seeded base. Swap the provider in <b>app/feed.py</b> for a live HKEX feed.</div>
+    </div>
+
+    <!-- Risk engine -->
+    <div class="panel">
+      <h2>Risk &amp; margin engine</h2>
+      <div class="row">
+        <div>
+          <label>Contract</label>
+          <select id="contract"><option value="HSI">HSI · Hang Seng</option>
+            <option value="MHI">MHI · Mini-HSI</option>
+            <option value="HHI">HHI · H-Shares</option></select>
+        </div>
+        <div><label>Position (qty)</label><input id="qty" type="number" value="10"></div>
+        <div><label>Entry (idx pts)</label><input id="entry" type="number" value="19500"></div>
+        <div><label>Mark (idx pts)</label><input id="mark" type="number" value="19800"></div>
+      </div>
+      <div class="out" id="riskOut">
+        <div class="tile"><div class="k">Notional</div><div class="v" id="rNotional">—</div></div>
+        <div class="tile"><div class="k">Point value</div><div class="v small" id="rValue">—</div></div>
+        <div class="tile"><div class="k">Initial margin</div><div class="v" id="rIM">—</div></div>
+        <div class="tile"><div class="k">Maintenance margin</div><div class="v small" id="rMM">—</div></div>
+        <div class="tile"><div class="k">Unrealised P&amp;L</div><div class="v" id="rPnl">—</div></div>
+        <div class="tile"><div class="k">Liq. price</div><div class="v" id="rLiq">—</div></div>
+      </div>
+      <div class="note">
+        <b>Danger zone:</b> notional = index × <span id="nMulti">50</span> HKD/pt × qty.
+        Margin tiers above 1,000 contracts raise per-contract initial margin.
+      </div>
+    </div>
+
+    <!-- Reference / interview quick hits -->
+    <div class="panel full">
+      <h2>Margin reference &amp; interview quick-hits</h2>
+      <table class="ref" id="refTable"></table>
+    </div>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (n,d=2)=> (n===null||n===undefined||isNaN(n)) ? '—' : Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const HKD = n=> 'HK$ ' + (n===null? '—':Number(n).toLocaleString('en-US',{maximumFractionDigits:0}));
+
+let chart = echarts.init($('spark'));
+function renderSpark(series, color){
+  chart.setOption({
+    grid:{left:6,right:6,top:6,bottom:6,containLabel:false},
+    xAxis:{type:'category',show:false,data:series.map((_,i)=>i)},
+    yAxis:{type:'value',show:false,scale:true},
+    series:[{type:'line',data:series,smooth:true,symbol:'none',
+      lineStyle:{color,width:2},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:color+'44'},{offset:1,color:color+'00'}])}}],
+    tooltip:{trigger:'axis',axisPointer:{type:'line'}}
+  });
+}
+
+// build a 60-point demo sparkline history seeded off the current snapshot
+let hist = [];
+function buildHist(base){
+  if(hist.length===0){ let v=base; for(let i=0;i<60;i++){ v += Math.sin(i/5)*2; hist.push(v);} }
+  else { hist.push(base); if(hist.length>60) hist.shift(); }
+  return hist;
+}
+
+async function refresh(){
+  try{
+    const m = await (await fetch('/api/market')).json();
+    const src = $('src');
+    src.textContent = m.source + ' feed';
+    src.className = 'src ' + m.source;
+    $('hsiIdx').textContent = fmt(m.hsi_index);
+    $('hsiFut').textContent = fmt(m.hsi_future);
+    $('hhiIdx').textContent = fmt(m.hhi_index);
+    const c = $('chg'); c.textContent = (m.change_pct>=0?'+':'')+fmt(m.change_pct)+'%';
+    c.className = 'v ' + (m.change_pct>=0?'up':'down');
+    renderSpark(buildHist(m.hsi_index), m.change_pct>=0?'#3ddc84':'#ff5566');
+  }catch(e){ $('hsiIdx').textContent='feed err'; }
+}
+
+async function loadContracts(){
+  const c = await (await fetch('/api/contracts')).json();
+  $('nMulti').textContent = c.HSI.multiplier_hkd;
+  const rows = Object.values(c).map(x=>`<tr><td>${x.code}</td><td>${x.name}</td>
+    <td>${HKD(x.multiplier_hkd)}/pt</td><td>${fmt(x.im_per_contract,0)} IM</td>
+    <td>${fmt(x.mm_per_contract,0)} MM</td><td>${HKD(x.im_per_contract_tier2)} tier2</td></tr>`).join('');
+  $('refTable').innerHTML = '<tr><td>Code</td><td>Contract</td><td>Point value</td><td>Init. margin</td><td>Maint. margin</td><td>IM &gt;1k ctr</td></tr>'+rows;
+}
+
+function activeContract(){ return $('contract').value; }
+
+// solve the risk profile client-side using the same formulas as app/risk.py
+function computeRisk(){
+  const q = parseInt($('qty').value)||0;
+  const e = parseFloat($('entry').value)||0;
+  const mk = parseFloat($('mark').value)||0;
+  // fetch contract params
+  fetch('/api/contracts').then(r=>r.json()).then(C=>{
+    const c = C[activeContract()]; if(!c) return;
+    const mult=c.multiplier_hkd;
+    const nim = Math.abs(q)>1000 ? c.im_per_contract_tier2 : c.im_per_contract;
+    const notional = mk*mult*Math.abs(q);
+    const im = nim*Math.abs(q);
+    const mm = c.mm_per_contract*Math.abs(q);
+    const pnl = (mk-e)*mult*q;
+    const liq = q>0 ? e - mm/(mult*Math.abs(q)) : e + mm/(mult*Math.abs(q));
+    $('rNotional').textContent = HKD(notional);
+    $('rValue').textContent = HKD(mult)+'/pt';
+    $('rIM').textContent = HKD(im);
+    $('rMM').textContent = HKD(mm);
+    const p=$('rPnl'); p.textContent = HKD(pnl); p.className='v '+(pnl>=0?'up':'down');
+    $('rLiq').textContent = fmt(liq,0);
+  });
+}
+
+refresh(); loadContracts();
+[ 'qty','entry','mark','contract' ].forEach(id=> $(id).addEventListener('input', computeRisk));
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
