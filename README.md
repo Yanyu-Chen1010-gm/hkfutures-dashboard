@@ -1,9 +1,5 @@
 # HK Futures · Risk & Market Monitor
 
-A lightweight client-support dashboard for **HKEX futures** (HSI / MHI / HHI).
-Built to be demo-able in an interview for a **quant futures client support**
-role.
-
 A quick look of demo dashboard is presented below:
 
 <img src="dashboard_demo.jpeg" alt="Snapshot of Dashboard Demo">
